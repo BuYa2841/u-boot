@@ -12,3 +12,5 @@ After changeset[3cf2c0a] there is added support to boot a slightly modified boot
 
 [1] https://github.com/99degree/u-boot/commit/3cf2c0aa42e2e8051fcfc4137c356f6c9cf7659b 
 [2] https://github.com/99degree/u-boot/commit/bddb6870a30bb26405ca49300eec8527e6a1bc2f 
+
+trigger ci
