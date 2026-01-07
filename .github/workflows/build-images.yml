@@ -30,12 +30,8 @@ jobs:
           sudo apt install -y --no-install-recommends \
             gcc-aarch64-linux-gnu \
             libgnutls28-dev \
-            make \
-            bc \
-            bison \
-            flex
+            make bc bison flex
 
-      # mkbootimg (Ubuntu paketi bozuk olduğu için)
       - name: Build mkbootimg
         run: |
           git clone https://github.com/osm0sis/mkbootimg --depth=1
@@ -43,27 +39,19 @@ jobs:
           CFLAGS=-Wstringop-overflow=0 make mkbootimg
           cd ..
 
-      # DEBUG: mevcut defconfig'leri görelim
-      - name: List available defconfigs
-        run: |
-          echo "=== QCOM defconfigs ==="
-          ls configs | grep -i qcom || true
-          echo "=== SM71xx defconfigs ==="
-          ls configs | grep -i 71 || true
-
       - name: Configure U-Boot
         run: |
-          # 1️⃣ GERÇEK defconfig
+          # 1️⃣ Base defconfig (GENERIC)
           make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
-            O=.output qcom_sm71xx_defconfig
+            O=.output defconfig
 
-          # 2️⃣ Qualcomm config fragment merge
+          # 2️⃣ Qualcomm fragment merge
           scripts/kconfig/merge_config.sh -O .output \
             .output/.config \
             configs/qcom-phone.config \
             configs/qcom-sm71xx.config
 
-          # 3️⃣ Finalize config
+          # 3️⃣ Finalize
           make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
             O=.output olddefconfig
 
