@@ -39,11 +39,18 @@ jobs:
           CFLAGS=-Wstringop-overflow=0 make mkbootimg
           cd ..
 
+      - name: Detect defconfig
+        id: defconfig
+        run: |
+          DEFCONFIG=$(ls configs/*defconfig | head -n 1 | xargs basename)
+          echo "Using defconfig: $DEFCONFIG"
+          echo "DEFCONFIG=$DEFCONFIG" >> $GITHUB_ENV
+
       - name: Configure U-Boot
         run: |
-          # 1️⃣ Base defconfig (GENERIC)
+          # 1️⃣ Found defconfig
           make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
-            O=.output defconfig
+            O=.output $DEFCONFIG
 
           # 2️⃣ Qualcomm fragment merge
           scripts/kconfig/merge_config.sh -O .output \
