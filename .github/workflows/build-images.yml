@@ -30,7 +30,6 @@ jobs:
           sudo apt update
           sudo apt install -y --no-install-recommends gcc-aarch64-linux-gnu libgnutls28-dev
 
-      # mkbootimg in Ubuntu repos is broken, so use the forked C variant
       - name: Build mkbootimg
         run: |
           git clone https://github.com/osm0sis/mkbootimg --depth=1
