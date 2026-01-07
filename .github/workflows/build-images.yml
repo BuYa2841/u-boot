@@ -1,21 +1,12 @@
 name: Build images
 
 on:
-  schedule:
-    - cron: "0 0 1 * *"
   workflow_dispatch:
   push:
     branches: [ next ]
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - device: sm7125-xiaomi-miatoll
-
-    name: Build ${{ matrix.device }}
     runs-on: ubuntu-latest
 
     steps:
@@ -24,66 +15,19 @@ jobs:
         with:
           ref: next
 
-      - name: Install dependencies
+      - name: Dump repo tree
         run: |
-          sudo apt update
-          sudo apt install -y --no-install-recommends \
-            gcc-aarch64-linux-gnu \
-            libgnutls28-dev \
-            make bc bison flex
-
-      - name: Build mkbootimg
-        run: |
-          git clone https://github.com/osm0sis/mkbootimg --depth=1
-          cd mkbootimg
-          CFLAGS=-Wstringop-overflow=0 make mkbootimg
-          cd ..
-
-      - name: Detect defconfig
-        id: defconfig
-        run: |
-          DEFCONFIG=$(ls configs/*defconfig | head -n 1 | xargs basename)
-          echo "Using defconfig: $DEFCONFIG"
-          echo "DEFCONFIG=$DEFCONFIG" >> $GITHUB_ENV
-
-      - name: Configure U-Boot
-        run: |
-          # 1️⃣ Found defconfig
-          make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
-            O=.output $DEFCONFIG
-
-          # 2️⃣ Qualcomm fragment merge
-          scripts/kconfig/merge_config.sh -O .output \
-            .output/.config \
-            configs/qcom-phone.config \
-            configs/qcom-sm71xx.config
-
-          # 3️⃣ Finalize
-          make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
-            O=.output olddefconfig
-
-      - name: Build U-Boot
-        run: |
-          make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
-            O=.output -j$(nproc)
-
-      - name: Assemble Android boot.img
-        run: |
-          ./mkbootimg/mkbootimg \
-            --base 0x0 \
-            --kernel_offset 0x8000 \
-            --pagesize 4096 \
-            --kernel .output/u-boot-fit-dtb.bin \
-            --ramdisk .output/fit-dtb.blob \
-            --ramdisk_offset 0x1000000 \
-            --dtb .output/dts/dt.dtb \
-            --dtb_offset 0x1f00000 \
-            --header_version 2 \
-            --second_offset 0x0 \
-            -o .output/u-boot.img
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: u-boot-${{ matrix.device }}.img
-          path: .output/u-boot.img
+          echo "=== ROOT ==="
+          ls -la
+          echo
+          echo "=== TOP-LEVEL FILES ==="
+          find . -maxdepth 1 -type f
+          echo
+          echo "=== DIRECTORIES ==="
+          find . -maxdepth 1 -type d
+          echo
+          echo "=== MAKEFILES ==="
+          find . -name Makefile
+          echo
+          echo "=== BUILD SCRIPTS ==="
+          find . -name "*.sh"
