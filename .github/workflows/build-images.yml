@@ -38,6 +38,15 @@ jobs:
           CFLAGS=-Wstringop-overflow=0 make mkbootimg
           cd ..
 
+        - name: List available defconfigs
+          run: |
+            ls configs | head -n 50
+            echo "---- QCOM ----"
+            ls configs | grep -i qcom || true
+            echo "---- SM71 ----"
+            ls configs | grep -i 71 || true
+
+
       - name: Configure U-Boot
         run: |
           make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- O=.output qcom_defconfig qcom-phone.config qcom-sm71xx.config
