@@ -3,7 +3,7 @@ name: Build images
 on:
   schedule:
     - cron: "0 0 1 * *"
-  workflow_dispatch:   # optional manual trigger
+  workflow_dispatch:
   push:
     branches: [ next ]
 
@@ -14,7 +14,6 @@ jobs:
       matrix:
         include:
           - device: sm7125-xiaomi-miatoll
-          #- device: sm7125-xiaomi-curtana
 
     name: Build ${{ matrix.device }}
     runs-on: ubuntu-latest
@@ -28,9 +27,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y --no-install-recommends gcc-aarch64-linux-gnu libgnutls28-dev
+          sudo apt install -y --no-install-recommends \
+            gcc-aarch64-linux-gnu \
+            libgnutls28-dev \
+            make \
+            bc \
+            bison \
+            flex
 
-      # mkbootimg in Ubuntu repos is broken, so use the forked C variant
+      # mkbootimg (Ubuntu paketi bozuk olduğu için)
       - name: Build mkbootimg
         run: |
           git clone https://github.com/osm0sis/mkbootimg --depth=1
@@ -38,29 +43,52 @@ jobs:
           CFLAGS=-Wstringop-overflow=0 make mkbootimg
           cd ..
 
-        - name: List available defconfigs
-          run: |
-            ls configs | head -n 50
-            echo "---- QCOM ----"
-            ls configs | grep -i qcom || true
-            echo "---- SM71 ----"
-            ls configs | grep -i 71 || true
+      # DEBUG: mevcut defconfig'leri görelim
+      - name: List available defconfigs
+        run: |
+          echo "=== QCOM defconfigs ==="
+          ls configs | grep -i qcom || true
+          echo "=== SM71xx defconfigs ==="
+          ls configs | grep -i 71 || true
 
       - name: Configure U-Boot
         run: |
-          make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- O=.output qcom_defconfig qcom-phone.config qcom-sm71xx.config
+          # 1️⃣ GERÇEK defconfig
+          make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
+            O=.output qcom_sm71xx_defconfig
+
+          # 2️⃣ Qualcomm config fragment merge
+          scripts/kconfig/merge_config.sh -O .output \
+            .output/.config \
+            configs/qcom-phone.config \
+            configs/qcom-sm71xx.config
+
+          # 3️⃣ Finalize config
+          make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
+            O=.output olddefconfig
 
       - name: Build U-Boot
         run: |
-          make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- O=.output -j$(nproc)
+          make ARCH=arm CROSS_COMPILE=aarch64-linux-gnu- \
+            O=.output -j$(nproc)
 
       - name: Assemble Android boot.img
         run: |
-          ./mkbootimg/mkbootimg --base 0x0 --kernel_offset 0x8000 --pagesize 4096 --kernel .output/u-boot-fit-dtb.bin --ramdisk .output/fit-dtb.blob --ramdisk_offset 0x1000000 --dtb .output/dts/dt.dtb --dtb_offset 0x1f00000 --header_version 2 --second_offset 0x0 -o .output/u-boot.img
+          ./mkbootimg/mkbootimg \
+            --base 0x0 \
+            --kernel_offset 0x8000 \
+            --pagesize 4096 \
+            --kernel .output/u-boot-fit-dtb.bin \
+            --ramdisk .output/fit-dtb.blob \
+            --ramdisk_offset 0x1000000 \
+            --dtb .output/dts/dt.dtb \
+            --dtb_offset 0x1f00000 \
+            --header_version 2 \
+            --second_offset 0x0 \
+            -o .output/u-boot.img
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: u-boot-${{ matrix.device }}.img
           path: .output/u-boot.img
-
